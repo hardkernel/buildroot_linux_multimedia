@@ -158,6 +158,18 @@ struct aml_audio_dec {
     fp_arm_omx_codec_get_FS     parm_omx_codec_get_FS;
     fp_arm_omx_codec_get_Nch    parm_omx_codec_get_Nch;
     int OmxFirstFrameDecoded;
+    float volume_ease_start;
+    float volume_ease_cur;
+    float volume_ease_end;
+    unsigned int volume_ease_duration;
+    unsigned int volume_ease_sample;
+    int volume_ease_method;
+    int volume_ease_update;
+    float volume_ease_end_staging;
+    unsigned int volume_ease_duration_staging;
+    int volume_ease_method_staging;
+
+    int gap_end_pts;
 };
 
 //from amcodec
@@ -174,6 +186,7 @@ typedef struct {
 	int SessionID;
 	int dspdec_not_supported;//check some profile that audiodsp decoder can not support,we switch to arm decoder	
 	int droppcm_flag;				// drop pcm flag, if switch audio (1)
+	int automute;
 } arm_audio_info;
 
  typedef struct {

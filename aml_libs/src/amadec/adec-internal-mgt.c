@@ -131,7 +131,7 @@ static void start_adec(aml_audio_dec_t *audec)
 				amsysfs_get_sysfs_str(TSYNC_VPTS, buf, sizeof(buf));
 				if (sscanf(buf, "0x%lx", &vpts) < 1) {
 					adec_print("unable to get vpts from: %s", buf);
-					return -1;
+					return;
 				}
 
 				// save vpts to apts
@@ -572,6 +572,10 @@ static int set_linux_audio_decoder(aml_audio_dec_t *audec)
     }	
     value = getenv("media_arm_audio_decoder");
     adec_print("media.armdecode.audiocodec = %s, t->type = %s\n", value, t->type);
+
+    audio_decoder = AUDIO_ARM_DECODER;
+    return 0;
+
     if (value!=NULL && match_types(t->type,value))
     {	
         char type_value[] = "ac3,eac3";

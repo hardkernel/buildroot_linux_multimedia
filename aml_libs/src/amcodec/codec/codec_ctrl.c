@@ -744,6 +744,8 @@ int codec_init(codec_para_t *pcodec)
         a_ainfo.bitrate    =pcodec->audio_info.bitrate;
         a_ainfo.block_align=pcodec->audio_info.block_align;
         a_ainfo.codec_id   =pcodec->audio_info.codec_id;
+        a_ainfo.automute   = pcodec->automute_flag;
+        a_ainfo.has_video  = pcodec->has_video;
         if(IS_AUIDO_NEED_EXT_INFO(pcodec->audio_type))
         {
             if (pcodec->audio_type != AFORMAT_WMA && pcodec->audio_type != AFORMAT_WMAPRO && pcodec->audio_type != AFORMAT_WMAVOI)
@@ -880,6 +882,8 @@ void codec_resume_audio(codec_para_t *pcodec, unsigned int orig)
         a_ainfo.bitrate    =pcodec->audio_info.bitrate;
         a_ainfo.block_align=pcodec->audio_info.block_align;
         a_ainfo.codec_id   =pcodec->audio_info.codec_id;
+        a_ainfo.automute   = pcodec->automute_flag;
+        a_ainfo.has_video  = pcodec->has_video;
 		if (pcodec->switch_audio_flag) {
 			a_ainfo.droppcm_flag = pcodec->switch_audio_flag;
 			if(pcodec->stream_type == STREAM_TYPE_TS || pcodec->stream_type == STREAM_TYPE_PS)

@@ -24,8 +24,8 @@
 #include "alsactl_parser.h"
 #include "alsa-out-raw.h"
 
-//#define adec_print printf
-#define adec_print
+#define adec_print printf
+//#define adec_print
 
 
 #define   PERIOD_SIZE  1024
@@ -45,7 +45,7 @@ static unsigned char decode_buffer[OUTPUT_BUFFER_SIZE + 64];
 
 static char sound_card_dev[10] = {0};
 
-
+int alsa_pause(struct aml_audio_dec* audec);
 
 #ifdef USE_INTERPOLATION
 static int pass1_history[8][8];
@@ -499,9 +499,20 @@ static void *alsa_playback_loop(void *args)
             offset = 0;
         }
 
-        while (alsa_params->pause_flag) {
+        if (audec->state == GAPPING) {
+            adec_print(" ****************** audio callback blocked by gapping");
+            alsa_pause(audec);
+            alsa_params->pause_flag = 1;
+        }
+
+        while ((alsa_params->pause_flag) && (!alsa_params->stop_flag)) {
+            adec_refresh_pts(audec);
             usleep(10000);
         }
+
+        if (alsa_params->stop_flag)
+            break;
+
 
         adec_refresh_pts(audec);
 
@@ -644,7 +655,7 @@ int alsa_init(struct aml_audio_dec* audec)
 
         sprintf(sound_card_dev, "hw:%d,%d", sound_card_id, sound_dev_id);
     }else {
-        memcpy(sound_card_dev, PCM_DEVICE_DEFAULT, sizeof(PCM_DEVICE_DEFAULT));
+        memcpy(sound_card_dev, PCM_DEVICE_DMIX, sizeof(PCM_DEVICE_DMIX));
         amsysfs_set_sysfs_int("/sys/class/audiodsp/digital_codec",0);//set output codec type as pcm
     }
     adec_print("[%s::%d]--[sound_card_dev:%s]\n",__FUNCTION__, __LINE__,sound_card_dev);
@@ -716,8 +727,9 @@ int alsa_start(struct aml_audio_dec* audec)
     int dgraw = amsysfs_get_sysfs_int("/sys/class/audiodsp/digital_raw");
 
     pthread_mutex_lock(&alsa_param->playback_mutex);
-    adec_print("yvonne pthread_cond_signalalsa_param->wait_flag=1\n");
+    //adec_print("yvonne pthread_cond_signalalsa_param->wait_flag=1\n");
     alsa_param->wait_flag=1;//yvonneadded
+    alsa_param->pause_flag=1;
     pthread_cond_signal(&alsa_param->playback_cond);
     pthread_mutex_unlock(&alsa_param->playback_mutex);
 
@@ -773,7 +785,7 @@ int alsa_pause(struct aml_audio_dec* audec)
  */
 int alsa_resume(struct aml_audio_dec* audec)
 {
-    adec_print("alsa out rsume\n");
+    adec_print("alsa out resume\n");
 
     int res = 0;
     alsa_param_t *alsa_params;

@@ -99,10 +99,13 @@ void adec_reset_track(aml_audio_dec_t *audec)
         out_ops->stop(audec);
         //audec->SessionID +=1;
         out_ops->init(audec);
-        if(audec->state == ACTIVE)
-        	out_ops->start(audec);
-        audec->format_changed_flag=0;
-    }
+        if(audec->state == ACTIVE) {
+            out_ops->start(audec);
+            out_ops->resume(audec);
+        }
+
+	    audec->format_changed_flag=0;
+	}
 }
 
 int audiodsp_format_update(aml_audio_dec_t *audec)

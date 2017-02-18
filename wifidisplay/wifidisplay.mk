@@ -24,7 +24,7 @@ $(WIFIDISPLAY_DIR)/.unpacked: wifidisplay-unpacked
 wifidisplay-unpacked:
 	-rm -rf $(WIFIDISPLAY_DIR)
 	mkdir -p $(WIFIDISPLAY_DIR)
-	cp -arf ../multimedia/wifidisplay/src/* $(WIFIDISPLAY_DIR)
+	cp -arf ./../multimedia/wifidisplay/src/* $(WIFIDISPLAY_DIR)
 	touch $(WIFIDISPLAY_DIR)/.unpacked
 
 $(WIFIDISPLAY_DIR)/.installed: $(WIFIDISPLAY_DIR)/wifidisplay
