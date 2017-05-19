@@ -34,7 +34,7 @@ endif
 
 define LIBPLAYER_CONFIGURE_CMDS
 		cd $(@D)/amffmpeg; \
-		$(TARGET_MAKE_ENV) \
+		$(TARGET_CONFIGURE_OPTS) \
 		./configure \
 		--prefix=$(STAGING_DIR)/usr \
 		--shlibdir=$(STAGING_DIR)/usr/lib/libplayer \
@@ -46,8 +46,8 @@ define LIBPLAYER_CONFIGURE_CMDS
 endef
 
 define LIBPLAYER_BUILD_CMDS
-	$(TARGET_MAKE_ENV) $(MAKE) CC=$(TARGET_CC) -C $(@D) all
-	$(TARGET_MAKE_ENV) $(MAKE) CC=$(TARGET_CC) -C $(@D) install
+	$(TARGET_CONFIGURE_OPTS) $(MAKE) -C $(@D) all
+	$(TARGET_CONFIGURE_OPTS) $(MAKE) -C $(@D) install
 endef
 
 define LIBPLAYER_CLEAN_CMDS
