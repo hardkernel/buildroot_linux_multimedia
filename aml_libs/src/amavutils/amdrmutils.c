@@ -129,20 +129,6 @@ int tvp_mm_get_mem_region(struct tvp_region* region, int region_size)
     //rnum = min(region_size/sizeof(struct tvp_region), MAX_REGION);
     rnum = region_size/sizeof(struct tvp_region);
 
-    fd = open(DI_TVP_REGION_PATH, O_RDONLY, 0644);
-    if (fd >=0 && rnum >= 1) {
-        len = read(fd, buf, BUF_LEN);
-        close(fd);
-        if (3 == sscanf(buf, "segment DI:%llx - %llx (size:0x%x)",
-                &start, &end, &siz)) {
-            region->start = start;
-            region->end = end;
-            region->mem_flags = 0;
-            region++;
-            //ALOGE("segment DI: [%llx-%llx]\n", i, start, end);
-        }
-    }
-
     fd = open(TVP_REGION_PATH, O_RDONLY, 0644);
     if (fd >= 0) {
         len = read(fd, buf, BUF_LEN);
