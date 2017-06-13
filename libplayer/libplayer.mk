@@ -38,7 +38,7 @@ define LIBPLAYER_CONFIGURE_CMDS
 		./configure \
 		--prefix=$(STAGING_DIR)/usr \
 		--shlibdir=$(STAGING_DIR)/usr/lib/libplayer \
-		--cross-prefix=$(BR2_TOOLCHAIN_EXTERNAL_PREFIX)- \
+		--cross-prefix=$(TARGET_CROSS) \
 		--arch=$(BR2_ARCH) \
 		--extra-ldflags='-L$(STAGING_DIR)/usr/lib/ -L$(STAGING_DIR)/usr/lib/libplayer -lamavutils -ldl' \
 		$(AMFFMPEG_CONF_OPTS) \
