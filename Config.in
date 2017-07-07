@@ -9,7 +9,6 @@ source "../multimedia/gst-fluendo-mpegdemux/Config.in"
 source "../multimedia/gst-aml-plugins/Config.in"
 source "../multimedia/gst-aml-plugins1/Config.in"
 source "../multimedia/gst-app/Config.in"
-source "../multimedia/aml_libs/Config.in"
 
 source "../multimedia/libplayer/Config.in"
 source "../multimedia/wifidisplay/Config.in"
