@@ -1,7 +1,8 @@
 config BR2_PACKAGE_LIBPLAYER
         bool "libplayer"
-	select BR2_PACKAGE_ALSA_LIB
-        select BR2_PACKAGE_ZLIB        
+        select BR2_PACKAGE_ALSA_LIB
+        select BR2_PACKAGE_ZLIB
+        select BR2_PACKAGE_LIBCURL
         help
           amlogic media player library.
 
