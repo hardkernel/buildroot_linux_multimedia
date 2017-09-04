@@ -12,4 +12,5 @@ source "../multimedia/gst-app/Config.in"
 
 source "../multimedia/libplayer/Config.in"
 source "../multimedia/wifidisplay/Config.in"
+source "../multimedia/test_tool/spdif_in_dd_decoder/Config.in"
 endmenu
