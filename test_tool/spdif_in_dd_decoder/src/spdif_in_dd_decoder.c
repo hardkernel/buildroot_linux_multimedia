@@ -12,15 +12,30 @@
 #include <pthread.h>
 #include <sched.h>
 #include <semaphore.h>
-
+#include <amconfigutils.h>
+#define PROPERTY_VALUE_MAX 127
 #define AVCODEC_MAX_AUDIO_FRAME_SIZE 500*1024
 #define AUDIO_EXTRA_DATA_SIZE   (8192)
+enum IEC61937_PC_Value {
+    IEC61937_AC3                = 0x01,          ///< AC-3 data
+    IEC61937_DTS1               = 0x0B,          ///< DTS type I   (512 samples)
+    IEC61937_DTS2               = 0x0C,          ///< DTS type II  (1024 samples)
+    IEC61937_DTS3               = 0x0D,          ///< DTS type III (2048 samples)
+    IEC61937_DTSHD              = 0x11,          ///< DTS HD data
+    IEC61937_EAC3               = 0x15,          ///< E-AC-3 data
+    IEC61937_TRUEHD             = 0x16,          ///< TrueHD data
+    IEC61937_PAUSE              = 0x03,          ///< Pause
+};
 typedef struct _audio_info {
     int bitrate;
     int samplerate;
     int channels;
     int file_profile;
+    int decoded_nb_frames;
+    int dropped_nb_frames;
+    int error_nb_frames;
 } AudioInfo;
+
 /* audio decoder operation*/
 typedef struct audio_decoder_operations audio_decoder_operations_t;
 struct audio_decoder_operations {
@@ -92,6 +107,14 @@ static void thread_start(void *arg){
             return -1;
     }
 }
+ static void dump_pcm_bin(char *path, char *buf, int size)
+ {
+     FILE *fp = fopen(path, "ab+");
+     if (fp != NULL) {
+         fwrite(buf, 1, size, fp);
+         fclose(fp);
+     }
+ }
 
 static int set_params_alsa(snd_pcm_t *handle, int rate, int channels)
 {
@@ -225,15 +248,48 @@ int alsa_init(void)
         return -1;
     }
     start_delay = 0;
+    printf("defaut alsa out rate :%d channel num:%d !!!\n",PCM_RATE,PCM_CHANNEL);
     set_params_alsa(handle_write, PCM_RATE, PCM_CHANNEL);
     return 0;
 }
+static size_t pcm_write(snd_pcm_t *handle_write, u_char * data, size_t count){
+    int err = 0;
+    while (count > 0) {
+        err = writei_func(handle_write, data, count);
 
-int find_audio_lib(audio_decoder_operations_t *adec_ops)
+        if (err == -EINTR) {
+            err = 0;
+        }
+        if (err == -ESTRPIPE) {
+            while ((err = snd_pcm_resume(handle_write)) == -EAGAIN) {
+                usleep(1000);
+            }
+        }
+
+        if (err < 0) {
+            printf("xun in\n");
+            if ((err = snd_pcm_prepare(handle_write)) < 0) {
+                //result = 0;
+                //goto  done;
+                break;
+            }
+        }
+
+        if (err > 0) {
+            //result += r;
+            count -= err;
+            data += err * 4;
+        }
+    }
+
+}
+
+int find_audio_lib(audio_decoder_operations_t *adec_ops,char *name)
 {
     void *fd = NULL;
     int err;
-    fd = dlopen("/usr/lib/libdcv.so", RTLD_LAZY);
+    //fd = dlopen("/usr/lib/libdcv.so", RTLD_LAZY);
+    fd = dlopen(name, RTLD_LAZY);
     if (fd != NULL) {
         printf("dlopen_success!\n");
         adec_ops->init    = dlsym(fd, "audio_dec_init");
@@ -250,25 +306,32 @@ int find_audio_lib(audio_decoder_operations_t *adec_ops)
 
 int main(int argc, char *argv[])
 {
-    int err;
+    int err,ret;
     int SyncFlag =0;
     int PthFlag = 0;
-    int read_dd_size = READ_DD_SIZE; /*read buffer*/
+    short read_dd_size = READ_DD_SIZE; /*read buffer*/
+    short pc;
+    short framesize;
     int decode_dd_size;
+    int audio_type = -1;
     char *outbuf = pcm_buf_out;
     int outlen;
     int pthread_id=1;
+    unsigned char value[PROPERTY_VALUE_MAX];
     unsigned char ptr_head[33] = { 0 };
+    unsigned char name[100] = { 0 };
     audio_decoder_operations_t *adec_ops;
+    AudioInfo  g_AudioInfo = {0};
+    memset(&g_AudioInfo, 0, sizeof(AudioInfo));
     audiobuf_in = (u_char *)malloc(SPDIF_FRAME * 4);
     adec_ops = malloc(sizeof(audio_decoder_operations_t));
     writei_func = snd_pcm_writei;
     readi_func = snd_pcm_readi;
     if (alsa_init() < 0 )
         return -1;
-    if (find_audio_lib(adec_ops) < 0 )
-        return -1;
-    adec_ops->init(adec_ops);
+    //if (find_audio_lib(adec_ops,name) < 0 )
+      //  return -1;
+    //adec_ops->init(adec_ops);
     printf("init success!\n");
     readi_func(handle_read, &ptr_head[0], 8);
     while (1) {
@@ -276,41 +339,95 @@ int main(int argc, char *argv[])
         while (!SyncFlag) {
             int i;
             for (i = 0; i <= 22; i++) {
-                if ((ptr_head[i] == 0x72 && ptr_head[i + 1] == 0xf8) && (ptr_head[i + 2] == 0x1f && ptr_head[i + 3] == 0x4e) &&
-                    ((ptr_head[i + 8] ==0x0b && ptr_head[i + 9] ==0x77) || (ptr_head[i + 8] ==0x77 && ptr_head[i + 9] ==0x0b)))
-                     {
-                         printf("find 61937 header, i =%d\n",i);
-                         if (i%4 != 0) {
-                             printf("err: read data with every frames, the header address can not be read, please open the tool again\n");
-                             return 0;
+                if ((ptr_head[i] == 0x72 && ptr_head[i + 1] == 0xf8) && ptr_head[i + 2] == 0x1f && ptr_head[i + 3] == 0x4e) {
+                     printf(" find 61937 header, i =%d\n",i);
+                     pc = *((short *)(ptr_head + i + 4));
+                     printf("pc:%0x \n",pc);
+                     if (pc == IEC61937_AC3) {
+                         sprintf(name, "%s","/usr/lib/libdcv.so");
+                         read_dd_size = SPDIF_FRAME;
+                         printf("detected DD IEC data !\n");
+                         ret = property_get("media.multich.support.info", value, NULL);
+                         if (ret > 0) {
+                            if (strcasecmp(value,"hdmi6") == 0) {
+                                printf("reconfig alsa out ,rate:%d channel num:%d",PCM_RATE,3 * PCM_CHANNEL);
+                                err =  set_params_alsa(handle_write, PCM_RATE, 3 * PCM_CHANNEL);
+                                if (err < 0) {
+                                    printf("set_spdif_alsa err\n");
+                                    return -1;
+                                 }
+                            }
                          }
-                         memcpy((unsigned char*) audiobuf_in , &ptr_head[i], 32 - i);
-                         readi_func(handle_read, (unsigned char*) audiobuf_in + 32 - i, SPDIF_FRAME -( 32 - i)/4);
-                         pthread_create(&pthread_id,NULL,thread_start, NULL);
-                         SyncFlag = 1;
-                         PthFlag = 1;
-                         break;
-                         }
+                     } else if (pc == IEC61937_DTS1 || pc == IEC61937_DTS2 || pc == IEC61937_DTS3){
+                          sprintf(name, "%s","/usr/lib/libdtscore.so");
+                          read_dd_size = 512 * 4;
+                          printf("detected DTS IEC data !\n");
+                          //ret = property_get("media.multich.support.info", value, NULL);
+                           if (property_get("media.dts.multichpcm", value, NULL) > 0 && !strcmp(value, "1")) {
+                               printf("reconfig alsa out ,rate:%d channel num:%d",PCM_RATE,3 * PCM_CHANNEL);
+                               err = set_params_alsa(handle_write, PCM_RATE, 3 * PCM_CHANNEL);
+                               if (err < 0) {
+                                    printf("set_spdif_alsa err\n");
+                                    return -1;
+                                }
+                           }
                      }
+                     if (audio_type == -1 || audio_type != pc) {
+                        if (find_audio_lib(adec_ops,name) < 0 )
+                          return -1;
+                        adec_ops->init(adec_ops);
+                     }
+                     audio_type = pc;
+                     if (i%4 != 0) {
+                         printf("err: read data with every frames, the header address can not be read, please open the tool again\n");
+                         return 0;
+                     }
+                     if (ptr_head[i] == 0x72 && ptr_head[i + 1] == 0xf8)
+                         framesize = (ptr_head[i + 7] << 8 |  ptr_head[i + 6]) >> 3;
+                     else
+                         framesize = (ptr_head[i + 6] << 8 |  ptr_head[i + 7]) >> 3;
+                     printf("framesize:%d read_dd_size:%d \n", framesize,read_dd_size);
+                     memcpy((unsigned char*) audiobuf_in , &ptr_head[i], 32 - i);
+                     readi_func(handle_read, (unsigned char*) audiobuf_in + 32 - i, SPDIF_FRAME -( 32 - i)/4);
+                     //pthread_create(&pthread_id,NULL,thread_start, NULL);
+                     SyncFlag = 1;
+                     PthFlag = 1;
+                     break;
+                 }
+            }
             if (SyncFlag != 1) {
                 ptr_head[0] = ptr_head[28];
                 ptr_head[1] = ptr_head[29];
                 ptr_head[2] = ptr_head[30];
                 ptr_head[3] = ptr_head[31];
                 readi_func(handle_read,&ptr_head[4], 7);
-                writei_func(handle_write, pcm_buf_mute, 7);
+                writei_func(handle_write, &ptr_head[4], 7);
             }
         }
 
         /*read -> decoder -> write*/
         while (1) {
-            readi_func(handle_read, (unsigned char*) audiobuf_in , READSIZE);
+            readi_func(handle_read, (unsigned char*) audiobuf_in , read_dd_size/4);
             if ((audiobuf_in[8] ==0x0b && audiobuf_in[9] ==0x77) ||
-               (audiobuf_in[8] ==0x77 && audiobuf_in[9] ==0x0b)) {
-                decode_dd_size = adec_ops->decode(adec_ops, outbuf, &outlen, (char *)(audiobuf_in + 8), read_dd_size);
-                if (outlen > AVCODEC_MAX_AUDIO_FRAME_SIZE)
-                    printf("fatal error,out buffer overwriten,out len %d,actual %d", outlen, AVCODEC_MAX_AUDIO_FRAME_SIZE);
-                writei_func(handle_write, (char *)outbuf, outlen /4);
+               (audiobuf_in[8] ==0x77 && audiobuf_in[9] ==0x0b) ||
+                ((audiobuf_in[8] ==0x7f && audiobuf_in[9] ==0xfe && audiobuf_in[10] ==0x80 && audiobuf_in[11] ==0x01)||
+                 (audiobuf_in[8] ==0xfe && audiobuf_in[9] ==0x7f && audiobuf_in[10] ==0x01 && audiobuf_in[11] ==0x80))
+                ) {
+                    decode_dd_size = adec_ops->decode(adec_ops, outbuf, &outlen, (char *)(audiobuf_in + 8), framesize);
+                    //printf("decode_dd_size:%d outlen:%d\n",decode_dd_size,outlen);
+
+                    if (outlen > AVCODEC_MAX_AUDIO_FRAME_SIZE)
+                        printf("fatal error,out buffer overwriten,out len %d,actual %d", outlen, AVCODEC_MAX_AUDIO_FRAME_SIZE);
+                    if (outlen > 0) {
+                        //to get frame samplerate and channelnum
+                        adec_ops->getinfo(adec_ops, &g_AudioInfo);
+                        //printf("src channel:%d sink channels:%d sink samplerate:%d \n",adec_ops->NchOriginal,g_AudioInfo.channels,g_AudioInfo.samplerate);
+                        dump_pcm_bin("/data/out_pcm.raw", outbuf, outlen);
+                        //writei_func(handle_write, (char *)outbuf, outlen /4);
+                    }
+                    int count = outlen /4;
+                    unsigned char *data = outbuf;
+                    pcm_write(handle_write, outbuf, count);
                 } else {
                 SyncFlag = 0;
                 writei_func(handle_write, pcm_buf_mute, READSIZE);

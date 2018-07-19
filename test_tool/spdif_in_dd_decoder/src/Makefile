@@ -11,9 +11,9 @@ spdif_in_dd_decoder_s=spdif_in_dd_decoder.c
 INSTALL_FLAGS=-m 755
 
 TARGET=spdif_in_dd_decoder
-
 LDFLAGS= -L$(PREFIX)/lib/libplayer -lavutil -lavformat -lavcodec -lm -lz -lpthread -lamcodec -ldl -lamplayer -lamadec -lasound -lamstreaming  -lamavutils -lrt -lstdc++
-CFLAGS+= -I${BUILD_DIR}/../amffmpeg -I${BUILD_DIR}/../amcodec/include -I${BUILD_DIR}/../amadec/include
+CFLAGS+= -I${BUILD_DIR}/../amffmpeg -I${BUILD_DIR}/../amcodec/include -I${BUILD_DIR}/../amadec/include -I${BUILD_DIR}/../../../libplayer/src/amavutils/include
+
 CFLAGS+= -I${BUILD_DIR}/../amplayer/player/include -I${BUILD_DIR}/../amplayer/player -I${BUILD_DIR}/../streamsource
 CFLAGS+= -I$(INC_DIR)
 CFLAGS+=-O2 -g
