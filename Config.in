@@ -16,4 +16,7 @@ source "../multimedia/test_tool/spdif_in_dd_decoder/Config.in"
 
 # secure video firmware load 
 source "../multimedia/secfirmload/Config.in"
+
+# hal audio
+source "../multimedia/aml_halaudio/Config.in"
 endmenu
