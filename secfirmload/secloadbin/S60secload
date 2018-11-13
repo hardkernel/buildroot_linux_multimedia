@@ -4,8 +4,9 @@
 #
 
 start() {
-	printf "Starting sec preload video firm: "
-	[/usr/bin/tee_preload_fw}
+	echo "Starting sec preload video firm: "
+	/usr/bin/tee_preload_fw /lib/firmware/video/video_ucode.bin
+}
 stop() {
 	echo "OK"
 }
