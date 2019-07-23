@@ -7,6 +7,12 @@ DOLBY_ATMOS_RELEASE_VERSION:=1.0.0
 DOLBY_ATMOS_RELEASE_SITE=$(TOPDIR)/../multimedia/dolby_atmos_release/src
 DOLBY_ATMOS_RELEASE_SITE_METHOD=local
 
+
+ifeq ($(BR2_aarch64),y)
+export ENABLE_ATMOS_64bit = yes
+endif
+
+
 define DOLBY_ATMOS_RELEASE_BUILD_CMDS
 	$(MAKE) CC=$(TARGET_CC) -C $(@D) all
 endef
